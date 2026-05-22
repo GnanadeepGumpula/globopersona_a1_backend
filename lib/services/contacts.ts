@@ -95,7 +95,7 @@ export async function createContact(client: SupabaseClient, workspaceId: string,
     entityId: inserted.id,
     type: 'contact.created',
     title: `Contact created: ${inserted.email}`,
-    details: { contactId: inserted.id }
+    details: { contactId: inserted.id, status: inserted.status, segmentId: inserted.segment_id }
   });
 
   return inserted as ContactRecord;
@@ -136,7 +136,12 @@ export async function updateContact(client: SupabaseClient, workspaceId: string,
     entityId: id,
     type: 'contact.updated',
     title: `Contact updated: ${updated.email}`,
-    details: { contactId: id }
+    details: {
+      contactId: id,
+      previousStatus: existing.status,
+      currentStatus: updated.status,
+      unsubscribed: Boolean((updated.metadata ?? {}).unsubscribed)
+    }
   });
 
   return updated as ContactRecord;

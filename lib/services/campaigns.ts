@@ -20,6 +20,7 @@ export async function listCampaigns(
     .select('*', { count: 'exact' })
     .eq('workspace_id', workspaceId)
     .is('deleted_at', null)
+    .neq('status', 'archived')
     .order('updated_at', { ascending: false })
     .range(paginationOffset(options.page, options.limit), paginationOffset(options.page, options.limit) + options.limit - 1);
 
@@ -149,6 +150,23 @@ export async function updateCampaign(
   });
 
   return updated as CampaignRecord;
+}
+
+export async function duplicateCampaign(client: SupabaseClient, workspaceId: string, actorUserId: string, id: string) {
+  const existing = await getCampaignById(client, workspaceId, id);
+
+  if (!existing) {
+    throw new AppError('Campaign not found', 404);
+  }
+
+  return createCampaign(client, workspaceId, actorUserId, {
+    name: `${existing.name} Copy`,
+    subject: existing.subject,
+    previewText: existing.preview_text,
+    content: existing.content,
+    status: 'draft',
+    scheduledAt: null
+  });
 }
 
 export async function deleteCampaign(client: SupabaseClient, workspaceId: string, actorUserId: string, id: string) {

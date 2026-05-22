@@ -34,6 +34,12 @@ export async function getDashboardSummary(client: SupabaseClient, workspaceId: s
 
   const sentCampaigns = (campaignRows as CampaignRecord[]).filter((item) => item.sent_at !== null).length;
   const engagedContacts = (contactRows as ContactRecord[]).filter((item) => item.status === 'engaged').length;
+  const totalCampaigns = campaigns.count ?? 0;
+  const totalContacts = contacts.count ?? 0;
+  const campaignVelocity = totalCampaigns ? Math.round((sentCampaigns / totalCampaigns) * 100) : 0;
+  const engagementRate = totalContacts ? Math.round((engagedContacts / totalContacts) * 100) : 0;
+  const workflowCoverage = Math.min(100, Math.round(((segments.count ?? 0) + (settings.data ?? []).length) * 10));
+  const trackingScore = Math.round((campaignVelocity * 0.4) + (engagementRate * 0.4) + (workflowCoverage * 0.2));
 
   return {
     campaigns: {
@@ -53,7 +59,13 @@ export async function getDashboardSummary(client: SupabaseClient, workspaceId: s
     segments: segments.count ?? 0,
     unreadNotifications: notifications.count ?? 0,
     activityCount: activities.count ?? 0,
-    settingsConfigured: (settings.data ?? []).length > 0
+    settingsConfigured: (settings.data ?? []).length > 0,
+    trackingScores: {
+      campaignVelocity,
+      engagementRate,
+      workflowCoverage,
+      trackingScore
+    }
   };
 }
 
