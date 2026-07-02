@@ -29,47 +29,93 @@ set company_name = excluded.company_name,
     logo_url = excluded.logo_url,
     preferences = excluded.preferences;
 
-insert into public.audience_segments (id, workspace_id, name, description, rules)
-values
-  ('22222222-2222-2222-2222-222222222221', '00000000-0000-0000-0000-000000000001', 'High Intent', 'Recent visitors and engaged leads', '{"score": {"gte": 80}}'::jsonb),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000001', 'New Subscribers', 'First week nurture flow', '{"tags": ["new"]}'::jsonb),
-  ('22222222-2222-2222-2222-222222222223', '00000000-0000-0000-0000-000000000001', 'VIP Customers', 'Top repeat customers', '{"lifetime_value": {"gte": 5000}}'::jsonb)
-on conflict (id) do nothing;
+insert into public.audience_segments (workspace_id, name, description, rules)
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  format('Audience Segment %s', index),
+  format('Seeded segment %s for demo outreach', index),
+  jsonb_build_object('score', jsonb_build_object('gte', 60 + index))
+from generate_series(1, 10) as index;
 
-insert into public.campaigns (id, workspace_id, name, subject, preview_text, content, status, scheduled_at, sent_at, created_by, updated_by)
-values
-  ('33333333-3333-3333-3333-333333333331', '00000000-0000-0000-0000-000000000001', 'Welcome Sequence', 'Welcome to Globopersona', 'Start the journey with a warm intro', '{"headline": "Welcome aboard", "cta": "Explore the dashboard"}'::jsonb, 'live', now() - interval '2 days', now() - interval '2 days', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333333332', '00000000-0000-0000-0000-000000000001', 'Spring Launch', 'Your sneak peek is ready', 'Big launch messaging for the season', '{"headline": "Launch week", "cta": "Learn more"}'::jsonb, 'scheduled', now() + interval '3 days', null, '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000001', 'Reactivation Drive', 'We miss you at Globopersona', 'Bring dormant contacts back', '{"headline": "Come back for a look", "cta": "View update"}'::jsonb, 'draft', null, null, '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333333334', '00000000-0000-0000-0000-000000000001', 'Referral Boost', 'Share Globopersona with a friend', 'Reward your best customers', '{"headline": "Invite and earn", "cta": "Get referral link"}'::jsonb, 'archived', null, now() - interval '12 days', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111')
-on conflict (id) do nothing;
+insert into public.campaigns (workspace_id, name, subject, preview_text, content, status, scheduled_at, sent_at, created_by, updated_by)
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  format('Campaign %s', index),
+  format('Subject line for campaign %s', index),
+  format('Preview text for campaign %s', index),
+  jsonb_build_object('headline', format('Heading %s', index), 'cta', format('Read campaign %s', index))::jsonb,
+  case
+    when index % 4 = 0 then 'draft'
+    when index % 4 = 1 then 'scheduled'
+    when index % 4 = 2 then 'live'
+    else 'archived'
+  end,
+  case when index % 4 = 1 then now() + interval '1 day' * index else null end,
+  case when index % 4 = 2 then now() - interval '1 day' * index else null end,
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  '11111111-1111-1111-1111-111111111111'::uuid
+from generate_series(1, 10) as index;
 
-insert into public.contacts (id, workspace_id, email, first_name, last_name, status, segment_id, metadata)
-values
-  ('44444444-4444-4444-4444-444444444441', '00000000-0000-0000-0000-000000000001', 'maya@northstar.com', 'Maya', 'Chen', 'engaged', '22222222-2222-2222-2222-222222222221', '{"company": "Northstar", "role": "Growth Lead"}'::jsonb),
-  ('44444444-4444-4444-4444-444444444442', '00000000-0000-0000-0000-000000000001', 'leo@brightlabs.com', 'Leo', 'Patel', 'nurture', '22222222-2222-2222-2222-222222222222', '{"company": "Bright Labs", "role": "Ops Manager"}'::jsonb),
-  ('44444444-4444-4444-4444-444444444443', '00000000-0000-0000-0000-000000000001', 'sofia@studioforge.com', 'Sofia', 'Rivera', 'active', '22222222-2222-2222-2222-222222222223', '{"company": "Studio Forge", "role": "Founder"}'::jsonb),
-  ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000001', 'noah@orbitpath.com', 'Noah', 'Kim', 'engaged', '22222222-2222-2222-2222-222222222221', '{"company": "Orbit Path", "role": "Marketing Lead"}'::jsonb)
-on conflict (id) do nothing;
+insert into public.contacts (workspace_id, email, first_name, last_name, status, segment_id, metadata)
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  format('contact%s@example.com', index),
+  format('Contact%s', index),
+  'Demo',
+  case
+    when index % 3 = 0 then 'active'
+    when index % 3 = 1 then 'engaged'
+    else 'nurture'
+  end,
+  (select id from public.audience_segments where workspace_id = '00000000-0000-0000-0000-000000000001'::uuid order by created_at limit 1 offset ((index - 1) % 10)),
+  jsonb_build_object('company', format('Company %s', index), 'role', format('Role %s', index))
+from generate_series(1, 10) as index;
 
-insert into public.notifications (id, workspace_id, user_id, title, body, is_read)
-values
-  ('55555555-5555-5555-5555-555555555551', '00000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Campaign ready for review', 'Spring Launch is scheduled for delivery.', false),
-  ('55555555-5555-5555-5555-555555555552', '00000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Audience segment updated', 'VIP Customers now includes 14 new contacts.', true)
-on conflict (id) do nothing;
+insert into public.notifications (workspace_id, user_id, title, body, is_read)
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  format('Notification %s', index),
+  format('Seeded notification %s for the workspace dashboard', index),
+  index % 2 = 0
+from generate_series(1, 10) as index;
 
-insert into public.activity_events (id, workspace_id, actor_user_id, entity_type, entity_id, type, title, details, created_at)
-values
-  ('66666666-6666-6666-6666-666666666661', '00000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'campaign', '33333333-3333-3333-3333-333333333331', 'campaign.sent', 'Welcome Sequence sent', '{"campaignId": "33333333-3333-3333-3333-333333333331"}'::jsonb, now() - interval '2 days'),
-  ('66666666-6666-6666-6666-666666666662', '00000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'contact', '44444444-4444-4444-4444-444444444441', 'contact.created', 'Contact added: maya@northstar.com', '{"contactId": "44444444-4444-4444-4444-444444444441"}'::jsonb, now() - interval '1 day'),
-  ('66666666-6666-6666-6666-666666666663', '00000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'settings', '00000000-0000-0000-0000-000000000001', 'settings.updated', 'Workspace settings updated', '{"workspaceId": "00000000-0000-0000-0000-000000000001"}'::jsonb, now() - interval '3 hours')
-on conflict (id) do nothing;
+insert into public.activity_events (workspace_id, actor_user_id, entity_type, entity_id, type, title, details, created_at)
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  case index % 4
+    when 0 then 'settings'
+    when 1 then 'campaign'
+    when 2 then 'contact'
+    else 'segment'
+  end,
+  null,
+  case index % 4
+    when 0 then 'settings.updated'
+    when 1 then 'campaign.created'
+    when 2 then 'contact.created'
+    else 'segment.created'
+  end,
+  format('Seeded activity %s', index),
+  jsonb_build_object('index', index),
+  now() - interval '1 day' * index
+from generate_series(1, 10) as index;
 
 insert into public.dashboard_metric_snapshots (workspace_id, metric_key, metric_value, period_start, period_end, computed_at)
-values
-  ('00000000-0000-0000-0000-000000000001', 'total_campaigns', 4, now() - interval '30 days', now(), now()),
-  ('00000000-0000-0000-0000-000000000001', 'total_contacts', 4, now() - interval '30 days', now(), now()),
-  ('00000000-0000-0000-0000-000000000001', 'unread_notifications', 1, now() - interval '30 days', now(), now())
-on conflict do nothing;
+select
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  case index % 5
+    when 0 then 'engagement_rate'
+    when 1 then 'deliverability'
+    when 2 then 'audience_freshness'
+    when 3 then 'tracking_score'
+    else 'contact_growth'
+  end,
+  60 + index,
+  now() - interval '30 days',
+  now(),
+  now() - interval '1 hour' * index
+from generate_series(1, 10) as index;
 
 commit;

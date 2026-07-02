@@ -228,6 +228,10 @@ create trigger notifications_set_updated_at
 before update on public.notifications
 for each row execute function public.set_updated_at();
 
+create trigger dashboard_metric_snapshots_set_updated_at
+before update on public.dashboard_metric_snapshots
+for each row execute function public.set_updated_at();
+
 alter table public.workspaces enable row level security;
 alter table public.profiles enable row level security;
 alter table public.workspace_settings enable row level security;
